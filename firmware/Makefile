@@ -148,7 +148,7 @@ endif
 fw-shipped-$(CONFIG_EPEN_WACOM_G9PM) += epen/W9001_B887.bin epen/W9001_B911.bin
 ifeq ("$(CONFIG_EPEN_WACOM_G9PLL)", "y")
 fw-shipped-$(CONFIG_N1A) += epen/W9007A_LT03.bin
-fw-shipped-$(CONFIG_V1A) += epen/W9007A_V1.bin
+fw-shipped-$(CONFIG_V1A) += epen/W9007A_V1_450.bin
 fw-shipped-$(CONFIG_CHAGALL) += epen/W9007A_V1.bin
 endif
 fw-shipped-$(CONFIG_EPEN_WACOM_G10PM) += epen/W9010_HA_B934.bin epen/W9010_HA_B968.bin
@@ -170,7 +170,7 @@ fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1664T) += tsp_atmel/mxtt_klimt.fw
 
 ifeq ("$(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S)", "y")
 fw-shipped-$(CONFIG_V1A) += tsp_atmel/mXT1664S_v.fw
-fw-shipped-$(CONFIG_V2A) += tsp_atmel/mXT1664S_v.fw
+fw-shipped-$(CONFIG_V2A) += tsp_atmel/mXT1664S_v2.fw
 fw-shipped-$(CONFIG_N1A) += tsp_atmel/mXT1664S_n.fw
 fw-shipped-$(CONFIG_N2A) += tsp_atmel/mXT1664S_n.fw
 endif
