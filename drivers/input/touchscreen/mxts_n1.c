@@ -569,12 +569,8 @@ static void mxt_report_input_data(struct mxt_data *data)
 	bool booster_restart = false;
 	u16 sum_size = 0;
 	u16 touchMajor; /* 0309 */
-#if defined(CONFIG_N1A)
-	unsigned char size_offset = 25;
-#endif
 #if TSP_USE_SHAPETOUCH /* 0309 */
 	u16 touchMinor;
-
 	u8 c1;
 	u8 c2;
 #endif
@@ -597,39 +593,19 @@ static void mxt_report_input_data(struct mxt_data *data)
 					data->fingers[i].x);
 			input_report_abs(data->input_dev, ABS_MT_POSITION_Y,
 					data->fingers[i].y);
+		touchMajor = data->fingers[i].w;   /* 0309 */
 #if TSP_USE_SHAPETOUCH  /* 0309 */
-//for improving palm sweep
-    c1 = data->fingers[i].component >> 4;
-    c2 = data->fingers[i].component & 0x0F;
-    //magnitude = sqrt(c1*c1 + c2*c2);
+		//for improving palm sweep
+		c1 = data->fingers[i].component >> 4;
+		c2 = data->fingers[i].component & 0x0F;
+		//magnitude = sqrt(c1*c1 + c2*c2);
 
-#if defined(CONFIG_N1A)
-		touchMajor = data->fingers[i].w + size_offset;   //ATML_0911
-        /* to make similar value with logcat data */
-        touchMajor <<=1;                      //ATML_0911
-        /* Put the same value on TouchMajor and TouchMinor to make Eccen = 1 */
-        touchMinor = touchMajor;
-    /* Need 2's complement conversion for the negative value */
-    if(c2 > 7) {
-      c2 ^= 0x0f;
-      c2 += 1;
-    }
-    /* +1 To prevent TouchMajor = 0 after multiplied by C2 */
-    c2 += 1;
-    /* Only '8' is a valid value for the palm sweep by test. */
-    c2 >>=2;
-	c2 +=1;
-    if(c2 > 1) {
-      touchMajor = touchMinor * c2;
-        }
-#else
-	touchMajor = data->fingers[i].w;
-	touchMinor = touchMajor;
-	touchMajor = touchMinor * int_sqrt(c1*c1 + c2*c2);
+		//0309	Need debug print for mag?
+		touchMinor = touchMajor;
+		touchMajor = touchMinor * int_sqrt(c1*c1 + c2*c2);
 
-#endif
-    input_report_abs(data->input_dev, ABS_MT_TOUCH_MINOR,
-        touchMinor);
+		input_report_abs(data->input_dev, ABS_MT_TOUCH_MINOR,
+				touchMinor);
 #endif
 		input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR,
 				touchMajor);
@@ -1020,14 +996,10 @@ static void mxt_treat_T9_object(struct mxt_data *data,
 		data->fingers[id].x = (msg[1] << 4) | (msg[3] >> 4);
 		data->fingers[id].y = (msg[2] << 4) | (msg[3] & 0xF);
 		if (msg[4] != 0) {
-#if defined(CONFIG_N1A)
-data->fingers[id].w = msg[4];
-#else
 			if (data->charging_mode)
 				data->fingers[id].w = msg[4];
 			else
 				data->fingers[id].w = msg[4] + 4;
-#endif
 		} else
 			data->fingers[id].w = 1;    //Passive stylus
 

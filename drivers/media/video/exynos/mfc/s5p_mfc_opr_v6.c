@@ -746,16 +746,25 @@ void s5p_mfc_enc_calc_src_size(struct s5p_mfc_ctx *ctx)
 		set_linear_stride_size(ctx, ctx->src_fmt);
 }
 
+#define CPB_GAP				65
+#define set_strm_size_max(cpb_max)	((cpb_max) - CPB_GAP)
+
 /* Set registers for decoding stream buffer */
 int s5p_mfc_set_dec_stream_buffer(struct s5p_mfc_ctx *ctx, dma_addr_t buf_addr,
 		  unsigned int start_num_byte, unsigned int strm_size)
 {
 	struct s5p_mfc_dev *dev;
 	struct s5p_mfc_buf_size *buf_size;
+	struct s5p_mfc_dec *dec;
 
 	mfc_debug_enter();
 	if (!ctx) {
 		mfc_err("no mfc context to run\n");
+		return -EINVAL;
+	}
+	dec = ctx->dec_priv;
+	if (!dec) {
+		mfc_err("no mfc decoder to run\n");
 		return -EINVAL;
 	}
 	dev = ctx->dev;
@@ -764,6 +773,11 @@ int s5p_mfc_set_dec_stream_buffer(struct s5p_mfc_ctx *ctx, dma_addr_t buf_addr,
 		return -EINVAL;
 	}
 	buf_size = dev->variant->buf_size;
+	if (strm_size >= dec->src_buf_size) {
+		mfc_info("Decrease strm_size : %d, gap : %d\n",
+					strm_size, CPB_GAP);
+		strm_size = set_strm_size_max(dec->src_buf_size);
+	}
 	mfc_debug(2, "inst_no: %d, buf_addr: 0x%08x, buf_size: 0x"
 		"%08x (%d)\n",  ctx->inst_no, buf_addr, strm_size, strm_size);
 	WRITEL(strm_size, S5P_FIMV_D_STREAM_DATA_SIZE);
@@ -2584,7 +2598,7 @@ static inline int s5p_mfc_run_enc_frame(struct s5p_mfc_ctx *ctx)
 	return 0;
 }
 
-static inline void s5p_mfc_run_init_dec(struct s5p_mfc_ctx *ctx)
+static inline int s5p_mfc_run_init_dec(struct s5p_mfc_ctx *ctx)
 {
 	struct s5p_mfc_dev *dev;
 	unsigned long flags;
@@ -2592,15 +2606,22 @@ static inline void s5p_mfc_run_init_dec(struct s5p_mfc_ctx *ctx)
 
 	if (!ctx) {
 		mfc_err("no mfc context to run\n");
-		return;
+		return -EINVAL;
 	}
 	dev = ctx->dev;
 	if (!dev) {
 		mfc_err("no mfc device to run\n");
-		return;
+		return -EINVAL;
 	}
 	/* Initializing decoding - parsing header */
 	spin_lock_irqsave(&dev->irqlock, flags);
+
+	if (list_empty(&ctx->src_queue)) {
+		spin_unlock_irqrestore(&dev->irqlock, flags);
+		mfc_err("no ctx src_queue to run\n");
+		return -EINVAL;
+	}
+
 	mfc_info("Preparing to init decoding.\n");
 	temp_vb = list_entry(ctx->src_queue.next, struct s5p_mfc_buf, list);
 	mfc_info("Header size: %d, (offset: %d)\n",
@@ -2622,6 +2643,8 @@ static inline void s5p_mfc_run_init_dec(struct s5p_mfc_ctx *ctx)
 		(unsigned long)s5p_mfc_mem_plane_addr(ctx, &temp_vb->vb, 0));
 	s5p_mfc_clean_ctx_int_flags(ctx);
 	s5p_mfc_init_decode(ctx);
+
+	return 0;
 }
 
 static inline void s5p_mfc_set_stride_enc(struct s5p_mfc_ctx *ctx)
@@ -2852,7 +2875,7 @@ void s5p_mfc_try_run(struct s5p_mfc_dev *dev)
 			ret = s5p_mfc_close_inst(ctx);
 			break;
 		case MFCINST_GOT_INST:
-			s5p_mfc_run_init_dec(ctx);
+			ret = s5p_mfc_run_init_dec(ctx);
 			break;
 		case MFCINST_HEAD_PARSED:
 			ret = s5p_mfc_run_init_dec_buffers(ctx);
@@ -2867,7 +2890,7 @@ void s5p_mfc_try_run(struct s5p_mfc_dev *dev)
 			mfc_debug(2, "Finished remaining frames after resolution change.\n");
 			ctx->capture_state = QUEUE_FREE;
 			mfc_debug(2, "Will re-init the codec`.\n");
-			s5p_mfc_run_init_dec(ctx);
+			ret = s5p_mfc_run_init_dec(ctx);
 			break;
 		case MFCINST_DPB_FLUSHING:
 			ret = s5p_mfc_dec_dpb_flush(ctx);
